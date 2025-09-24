@@ -1,8 +1,15 @@
 [project]
 name = "screen-vlm"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automated screenshot analysis using Vision Language Models with Gradio UI"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "gradio>=4.44.1",
+    "litellm>=1.77.3",
+    "numpy>=2.0.2",
+    "opencv-python>=4.11.0.86",
+    "pillow>=10.4.0",
+    "pyautogui>=0.9.54",
+    "pydantic>=2.11.9",
 ]

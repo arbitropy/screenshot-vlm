@@ -1,6 +1,10 @@
 # Python program to take
 # screenshots
 
+import os
+
+os.environ['DISPLAY'] = ':0'
+
 
 import numpy as np
 import cv2

@@ -1,3 +1,7 @@
+
+import os
+os.environ['DISPLAY'] = ':0'
+
 import asyncio
 import base64
 import io
@@ -15,12 +19,12 @@ from pydantic import BaseModel, Field
 
 
 class ScreenAnalysisResult(BaseModel):
-    """
-    Pydantic model for structured VLM response.
-    You can customize this based on your needs.
-    """
-    reasoning: Optional[str] = FI
-
+    reasoning: str = Field(description="Model's reasoning about the screenshot's eligibility to invoke the tool")
+    decision: bool = Field(description="Whether to invoke the tool or not")
+    
+    def __str__(self):
+        return f"Decision: {self.decision}\nReasoning: {self.reasoning}"
+    
 
 class VLMScreenshotAnalyzer:
     """
@@ -29,8 +33,8 @@ class VLMScreenshotAnalyzer:
     
     def __init__(
         self,
-        model: str = "gpt-4-vision-preview",
-        api_key: Optional[str] = None,
+        model: str = "openai/gemma3:27b",
+        api_key: Optional[str] = "kobold",
         min_interval: int = 5,
         max_interval: int = 30,
         save_screenshots: bool = True,
@@ -131,39 +135,19 @@ class VLMScreenshotAnalyzer:
                         ]
                     }
                 ],
+                base_url="https://ollama-scm.transformsai.org/v1/",
                 api_key=self.api_key,
-                temperature=0.3,  # Lower temperature for more consistent responses
-                max_tokens=1000
+                temperature=0.01,  # Lower temperature for more consistent responses
+                max_tokens=1000,
+                response_format=ScreenAnalysisResult
             )
             
-            # Extract response content
-            content = response.choices[0].message.content
-            
-            # For now, create a basic structured response
-            # You can enhance this to parse JSON from the model response
-            current_time = time.strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Simple parsing - you might want to improve this based on your prompt
-            result = ScreenAnalysisResult(
-                description=content[:200] + "..." if len(content) > 200 else content,
-                confidence=0.8,  # You can extract this from the response
-                detected_elements=["screen_content"],  # Parse from response
-                action_suggestions=["analyze_further"],  # Parse from response
-                timestamp=current_time
-            )
-            
-            return result
+            return response.choices[0].message.content
             
         except Exception as e:
             print(f"Error analyzing screenshot: {e}")
             # Return a default result on error
-            return ScreenAnalysisResult(
-                description=f"Error analyzing screenshot: {str(e)}",
-                confidence=0.0,
-                detected_elements=[],
-                action_suggestions=[],
-                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
-            )
+            return ""
     
     def get_next_interval(self) -> int:
         """Get random interval between min and max seconds."""
@@ -209,11 +193,7 @@ class VLMScreenshotAnalyzer:
                 
                 # Print results
                 print(f"Analysis Result:")
-                print(f"  Description: {analysis.description}")
-                print(f"  Confidence: {analysis.confidence}")
-                print(f"  Elements: {analysis.detected_elements}")
-                print(f"  Suggestions: {analysis.action_suggestions}")
-                print(f"  Timestamp: {analysis.timestamp}")
+                print(analysis)
                 
                 # Wait for next interval
                 next_interval = self.get_next_interval()
@@ -232,28 +212,20 @@ async def main():
     """
     # Initialize analyzer
     analyzer = VLMScreenshotAnalyzer(
-        model="gpt-4-vision-preview",  # or "gpt-4o" for latest
-        # api_key="your-api-key-here",  # or set OPENAI_API_KEY environment variable
-        min_interval=10,  # Minimum 10 seconds between screenshots
-        max_interval=60,  # Maximum 60 seconds between screenshots
+        min_interval=2,  # Minimum 2 seconds between screenshots
+        max_interval=5,  # Maximum 5 seconds between screenshots
         save_screenshots=True,
         screenshot_dir="screenshots"
     )
     
     # Custom prompt for your specific use case
     custom_prompt = """
-    Analyze this screenshot and tell me:
-    1. What application or website is currently active?
-    2. What is the user likely doing?
-    3. Are there any notable UI elements or content?
-    4. What actions might the user take next?
-    
-    Be concise but detailed in your analysis.
+    Analyze the screenshot and determine if it contains any political content, based on the screenshot, give your reasoning and a boolean decision to weather politics tool should be invoked or not.
     """
     
     # Run for 30 minutes (or remove duration_minutes for infinite)
     await analyzer.run_continuous_analysis(
-        duration_minutes=30,
+        # duration_minutes=30,
         custom_prompt=custom_prompt
     )
 
